@@ -221,7 +221,6 @@
             border: 1px solid #3b82f6;
         }
 
-        /* TOMBOL LOG OUT */
         .btn-logout {
             background-color: #ef4444;
             color: #ffffff;
@@ -437,7 +436,6 @@
             </div>
         </header>
 
-        <!-- BARIS INFORMASI PROFIL SAAT TERHUBUNG CHAT -->
         <div id="partner-profile-bar" class="hidden">
             <div class="profile-card-mini">
                 <img id="partner-avatar" src="" alt="Lawan">
@@ -459,7 +457,7 @@
     </div>
 
     <script>
-        // State & Profil Default
+        // State & Profil
         let authMode = 'register';
         let myProfile = {
             name: '',
@@ -490,14 +488,50 @@
         const btnSend = document.getElementById('btn-send');
         const btnAction = document.getElementById('btn-action');
 
-        // --- MANAJEMEN PERSISTENSI SESI (LOCALSTORAGE) ---
+        // --- MANAJEMEN DEPO PENYIMPANAN PERSISTEN (STORAGE & COOKIES FALLBACK) ---
+        function setStorageItem(key, value) {
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {}
+            // Fallback ke Cookie jika localStorage diblokir/gagal
+            const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+            document.cookie = `${key}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+        }
+
+        function getStorageItem(key) {
+            try {
+                const item = localStorage.getItem(key);
+                if (item) return item;
+            } catch (e) {}
+            
+            // Ambil dari Cookie
+            const nameEQ = key + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i].trim();
+                if (c.indexOf(nameEQ) === 0) {
+                    return decodeURIComponent(c.substring(nameEQ.length, c.length));
+                }
+            }
+            return null;
+        }
+
+        function removeStorageItem(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {}
+            document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+
         function checkAutoLogin() {
-            const savedProfile = localStorage.getItem('anonchat_user_profile');
-            const isLoggedIn = localStorage.getItem('anonchat_is_loggedin');
+            const savedProfile = getStorageItem('anonchat_user_profile');
+            const isLoggedIn = getStorageItem('anonchat_is_loggedin');
 
             if (isLoggedIn === 'true' && savedProfile) {
-                myProfile = JSON.parse(savedProfile);
-                enterChatApp();
+                try {
+                    myProfile = JSON.parse(savedProfile);
+                    enterChatApp();
+                } catch(e) {}
             }
         }
 
@@ -546,13 +580,13 @@
             if (authMode === 'register') {
                 openProfileModal();
             } else {
-                localStorage.setItem('anonchat_is_loggedin', 'true');
-                localStorage.setItem('anonchat_user_profile', JSON.stringify(myProfile));
+                setStorageItem('anonchat_is_loggedin', 'true');
+                setStorageItem('anonchat_user_profile', JSON.stringify(myProfile));
                 enterChatApp();
             }
         }
 
-        // FUNGSIONALITAS LOG OUT (MENGAPUS SESI DARI LOCALSTORAGE)
+        // LOG OUT
         function handleLogout() {
             stopChat(false);
 
@@ -565,9 +599,8 @@
                 peer = null;
             }
 
-            // Hapus status simpanan di browser
-            localStorage.removeItem('anonchat_is_loggedin');
-            localStorage.removeItem('anonchat_user_profile');
+            removeStorageItem('anonchat_is_loggedin');
+            removeStorageItem('anonchat_user_profile');
 
             document.getElementById('auth-username').value = '';
             document.getElementById('auth-password').value = '';
@@ -620,9 +653,8 @@
             myProfile.age = calculateAge(myProfile.dob);
             myProfile.avatar = document.getElementById('avatar-preview').src;
 
-            // Simpan profil & sesi ke LocalStorage
-            localStorage.setItem('anonchat_is_loggedin', 'true');
-            localStorage.setItem('anonchat_user_profile', JSON.stringify(myProfile));
+            setStorageItem('anonchat_is_loggedin', 'true');
+            setStorageItem('anonchat_user_profile', JSON.stringify(myProfile));
 
             enterChatApp();
         }
@@ -765,8 +797,8 @@
             if (e.key === 'Enter') sendMessage();
         }
 
-        // PERIKSA STATUS LOGIN SAAT HALAMAN SELESAI DIMUAT
-        window.onload = checkAutoLogin;
+        // Jalankan Pengecekan Login Otomatis
+        document.addEventListener('DOMContentLoaded', checkAutoLogin);
     </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Anonymous Chat Rafzx</title>
+    <title>Anonymous P2P Chat</title>
     <style>
         * {
             box-sizing: border-box;
@@ -19,10 +19,9 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            min-height: 100dvh; /* Menyesuaikan toolbar browser di HP */
+            min-height: 100dvh;
         }
 
-        /* --- CONTAINER UTAMA (RESPONSIF) --- */
         .app-container {
             width: 100%;
             height: 100vh;
@@ -34,7 +33,6 @@
             overflow: hidden;
         }
 
-        /* Tampilan Khusus Laptop / Tablet (Layar Lebar) */
         @media (min-width: 768px) {
             .app-container {
                 max-width: 768px;
@@ -45,7 +43,6 @@
             }
         }
 
-        /* --- HEADER --- */
         header {
             background-color: #0f172a;
             padding: 14px 20px;
@@ -88,7 +85,6 @@
             100% { opacity: 1; }
         }
 
-        /* --- AREA CHAT BOX --- */
         #chat-box {
             flex: 1;
             padding: 16px;
@@ -139,7 +135,6 @@
             margin: 4px 0;
         }
 
-        /* --- INPUT & TOMBOL KONTROL --- */
         #controls {
             display: flex;
             padding: 12px 16px;
@@ -190,13 +185,14 @@
             cursor: not-allowed;
         }
 
-        #btn-start {
+        .btn-start-style {
             background-color: #2563eb;
             color: #ffffff;
         }
 
-        #btn-start:hover:not(:disabled) {
-            background-color: #1d4ed8;
+        .btn-stop-style {
+            background-color: #dc2626;
+            color: #ffffff;
         }
 
         #btn-send {
@@ -209,7 +205,6 @@
         }
     </style>
 
-    <!-- External Libraries: PeerJS & MQTT Client -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
@@ -227,7 +222,7 @@
         <div id="chat-box"></div>
 
         <div id="controls">
-            <button id="btn-start" onclick="startSearch()">Start</button>
+            <button id="btn-action" class="btn-start-style" onclick="handleActionClick()">Start</button>
             <input type="text" id="msg-input" placeholder="Ketik pesan..." disabled onkeypress="handleKeyPress(event)">
             <button id="btn-send" onclick="sendMessage()" disabled>Kirim</button>
         </div>
@@ -243,11 +238,12 @@
         let myPeerId = "user_" + Math.random().toString(36).substr(2, 8);
         
         let activeUsers = new Map();
-        let heartbeatInterval = null;
+        let isConnected = false;
 
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg-input');
         const btnSend = document.getElementById('btn-send');
+        const btnAction = document.getElementById('btn-action');
         const onlineCountEl = document.getElementById('online-count');
 
         function addSystemMsg(text) {
@@ -282,7 +278,7 @@
                 mqttClient.subscribe(PRESENCE_TOPIC + '+');
 
                 sendHeartbeat();
-                heartbeatInterval = setInterval(sendHeartbeat, 5000);
+                setInterval(sendHeartbeat, 5000);
             });
 
             mqttClient.on('message', (topic, message) => {
@@ -302,7 +298,7 @@
 
                 try {
                     const data = JSON.parse(payloadStr);
-                    if (data.action === 'search' && data.id !== myPeerId && !conn) {
+                    if (data.action === 'search' && data.id !== myPeerId && !conn && !isConnected) {
                         conn = peer.connect(data.id);
                         conn.on('open', () => {
                             setupConnectionHandlers();
@@ -332,15 +328,52 @@
             onlineCountEl.innerText = activeUsers.size;
         }
 
-        // --- SISTEM P2P CHAT ---
+        // --- SISTEM TOMBOL DINAMIS (START/STOP/NEXT) ---
+        function handleActionClick() {
+            if (isConnected) {
+                // Jika sedang terhubung, hentikan percakapan
+                stopChat(true);
+            } else {
+                // Jika tidak terhubung, cari orang asing baru
+                startSearch();
+            }
+        }
+
+        function setActionState(state) {
+            if (state === 'connected') {
+                btnAction.innerText = 'Stop';
+                btnAction.className = 'btn-stop-style';
+                isConnected = true;
+                msgInput.disabled = false;
+                btnSend.disabled = false;
+            } else {
+                btnAction.innerText = 'Next';
+                btnAction.className = 'btn-start-style';
+                isConnected = false;
+                msgInput.disabled = true;
+                btnSend.disabled = true;
+            }
+        }
+
+        function stopChat(initiatedByMe) {
+            if (conn) {
+                conn.close();
+                conn = null;
+            }
+            setActionState('disconnected');
+            if (initiatedByMe) {
+                addSystemMsg('Anda telah memutuskan obrolan.');
+            }
+        }
+
         function startSearch() {
             if (conn) conn.close();
             if (peer) peer.destroy();
 
             chatBox.innerHTML = '';
-            addSystemMsg('mencari orang...');
-            msgInput.disabled = true;
-            btnSend.disabled = true;
+            addSystemMsg('Menyiapkan koneksi P2P...');
+            setActionState('disconnected');
+            btnAction.innerText = 'Mencari...';
 
             peer = new Peer(myPeerId);
 
@@ -352,24 +385,25 @@
             });
 
             peer.on('connection', (incomingConn) => {
+                if (isConnected) return;
                 conn = incomingConn;
                 setupConnectionHandlers();
             });
         }
 
         function setupConnectionHandlers() {
+            setActionState('connected');
             addSystemMsg('Terhubung dengan orang asing!');
-            msgInput.disabled = false;
-            btnSend.disabled = false;
 
             conn.on('data', (data) => {
                 addMsg(data, false);
             });
 
             conn.on('close', () => {
-                addSystemMsg('Lawan bicara terputus.');
-                msgInput.disabled = true;
-                btnSend.disabled = true;
+                if (isConnected) {
+                    addSystemMsg('Lawan bicara telah memutuskan percakapan.');
+                    stopChat(false);
+                }
             });
         }
 

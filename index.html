@@ -459,7 +459,7 @@
     </div>
 
     <script>
-        // State & Profil
+        // State & Profil Default
         let authMode = 'register';
         let myProfile = {
             name: '',
@@ -489,6 +489,28 @@
         const msgInput = document.getElementById('msg-input');
         const btnSend = document.getElementById('btn-send');
         const btnAction = document.getElementById('btn-action');
+
+        // --- MANAJEMEN PERSISTENSI SESI (LOCALSTORAGE) ---
+        function checkAutoLogin() {
+            const savedProfile = localStorage.getItem('anonchat_user_profile');
+            const isLoggedIn = localStorage.getItem('anonchat_is_loggedin');
+
+            if (isLoggedIn === 'true' && savedProfile) {
+                myProfile = JSON.parse(savedProfile);
+                enterChatApp();
+            }
+        }
+
+        function enterChatApp() {
+            landingPage.classList.add('hidden');
+            authModal.classList.add('hidden');
+            profileModal.classList.add('hidden');
+            
+            document.getElementById('my-nav-avatar').src = myProfile.avatar || 'https://via.placeholder.com/80?text=User';
+            appChat.classList.remove('hidden');
+
+            initMQTT();
+        }
 
         // --- AUTHENTICATION FLOW ---
         function openAuthModal(mode) {
@@ -524,18 +546,16 @@
             if (authMode === 'register') {
                 openProfileModal();
             } else {
-                document.getElementById('my-nav-avatar').src = myProfile.avatar;
-                appChat.classList.remove('hidden');
-                initMQTT();
+                localStorage.setItem('anonchat_is_loggedin', 'true');
+                localStorage.setItem('anonchat_user_profile', JSON.stringify(myProfile));
+                enterChatApp();
             }
         }
 
-        // FUNGSIONALITAS LOG OUT
+        // FUNGSIONALITAS LOG OUT (MENGAPUS SESI DARI LOCALSTORAGE)
         function handleLogout() {
-            // Putuskan obrolan aktif jika ada
             stopChat(false);
 
-            // Tutup koneksi signaling MQTT & PeerJS
             if (mqttClient) {
                 mqttClient.end();
                 mqttClient = null;
@@ -545,7 +565,10 @@
                 peer = null;
             }
 
-            // Reset Form & State Profil
+            // Hapus status simpanan di browser
+            localStorage.removeItem('anonchat_is_loggedin');
+            localStorage.removeItem('anonchat_user_profile');
+
             document.getElementById('auth-username').value = '';
             document.getElementById('auth-password').value = '';
             myProfile = {
@@ -555,10 +578,7 @@
                 avatar: 'https://via.placeholder.com/80?text=User'
             };
 
-            // Bersihkan Tampilan Chat
             chatBox.innerHTML = '';
-
-            // Sembunyikan Aplikasi Chat & Tampilkan Kembali Dashboard Utama
             appChat.classList.add('hidden');
             landingPage.classList.remove('hidden');
         }
@@ -600,12 +620,11 @@
             myProfile.age = calculateAge(myProfile.dob);
             myProfile.avatar = document.getElementById('avatar-preview').src;
 
-            document.getElementById('my-nav-avatar').src = myProfile.avatar;
+            // Simpan profil & sesi ke LocalStorage
+            localStorage.setItem('anonchat_is_loggedin', 'true');
+            localStorage.setItem('anonchat_user_profile', JSON.stringify(myProfile));
 
-            profileModal.classList.add('hidden');
-            appChat.classList.remove('hidden');
-
-            initMQTT();
+            enterChatApp();
         }
 
         // --- P2P CHAT ENGINE ---
@@ -745,6 +764,9 @@
         function handleKeyPress(e) {
             if (e.key === 'Enter') sendMessage();
         }
+
+        // PERIKSA STATUS LOGIN SAAT HALAMAN SELESAI DIMUAT
+        window.onload = checkAutoLogin;
     </script>
 </body>
 </html>

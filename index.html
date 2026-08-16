@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AnonChat Rafzx</title>
+    <title>AnonChat & Dashboard</title>
     <style>
         * {
             box-sizing: border-box;
@@ -307,6 +307,77 @@
             color: #94a3b8;
         }
 
+        /* --- VIDEO CALL CONTAINER --- */
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background-color: #020617;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+        }
+
+        #remote-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #local-video {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            width: 90px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #3b82f6;
+            background-color: #000;
+            z-index: 10;
+        }
+
+        .video-controls {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 20;
+            background: rgba(15, 23, 42, 0.7);
+            padding: 6px 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+        }
+
+        .btn-icon {
+            background-color: #334155;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .btn-icon.active {
+            background-color: #ef4444;
+        }
+
+        .btn-call {
+            background-color: #10b981;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
         /* --- AREA CHAT --- */
         #chat-box {
             flex: 1;
@@ -402,8 +473,8 @@
 
     <!-- 1. LANDING PAGE / DASHBOARD UTAMA -->
     <div id="landing-page">
-        <h1 class="hero-title">Cari Teman/pacar Baru Anda Di Web Ini</h1>
-        <p class="hero-desc">web terbaru cari teman baru atau pacar</p>
+        <h1 class="hero-title">Temukan Teman Bicara Baru</h1>
+        <p class="hero-desc">Platform percakapan acak P2P langsung dari peramban Anda. Aman, cepat, dan privat.</p>
         
         <div class="online-badge">
             <span class="online-dot"></span>
@@ -485,7 +556,21 @@
                     <span id="partner-age" class="profile-age">Umur: -</span>
                 </div>
             </div>
-            <span style="font-size:0.75rem; color:#10b981; font-weight:bold;">Terhubung</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button id="btn-call-video" class="btn-call" onclick="startVideoCall()">📹 Video Call</button>
+                <span style="font-size:0.75rem; color:#10b981; font-weight:bold;">Terhubung</span>
+            </div>
+        </div>
+
+        <!-- CONTAINER VIDEO CALL -->
+        <div id="video-container" class="hidden">
+            <video id="remote-video" autoplay playsinline></video>
+            <video id="local-video" autoplay playsinline muted></video>
+            <div class="video-controls">
+                <button id="btn-toggle-mic" class="btn-icon" onclick="toggleMic()">Mic On</button>
+                <button id="btn-toggle-cam" class="btn-icon" onclick="toggleCam()">Cam On</button>
+                <button class="btn-icon active" onclick="endVideoCall()">End Call</button>
+            </div>
         </div>
 
         <div id="chat-box"></div>
@@ -515,6 +600,10 @@
         
         let peer = null;
         let conn = null;
+        let mediaCall = null;
+        let localStream = null;
+        let remoteStream = null;
+
         let mqttClient = null;
         let myPeerId = "user_" + Math.random().toString(36).substr(2, 8);
         let isConnected = false;
@@ -534,6 +623,10 @@
         const msgInput = document.getElementById('msg-input');
         const btnSend = document.getElementById('btn-send');
         const btnAction = document.getElementById('btn-action');
+
+        const videoContainer = document.getElementById('video-container');
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
 
         // --- STORAGE MANAGEMENT ---
         function setStorageItem(key, value) {
@@ -564,7 +657,7 @@
         }
 
         function checkAutoLogin() {
-            initMQTT(); // Jalankan MQTT dari awal untuk menghitung pengguna online di Landing Page
+            initMQTT();
 
             const savedProfile = getStorageItem('anonchat_user_profile');
             const isLoggedIn = getStorageItem('anonchat_is_loggedin');
@@ -657,7 +750,7 @@
             appChat.classList.add('hidden');
             landingPage.classList.remove('hidden');
             
-            initMQTT(); // Re-init MQTT untuk landing page
+            initMQTT();
         }
 
         function openProfileModal() {
@@ -714,7 +807,6 @@
                 mqttClient.subscribe(SIGNAL_TOPIC);
                 mqttClient.subscribe(PRESENCE_TOPIC);
 
-                // Mulai Kirim Heartbeat Setiap 3 Detik
                 startHeartbeat();
             });
 
@@ -722,13 +814,11 @@
                 try {
                     const data = JSON.parse(message.toString());
 
-                    // Handling Presence / Online Count
                     if (topic === PRESENCE_TOPIC && data.id) {
                         activeUsers.set(data.id, Date.now());
                         updateOnlineUI();
                     }
 
-                    // Handling Matchmaking Queue
                     if (topic === SIGNAL_TOPIC && data.action === 'search' && data.id !== myPeerId && !conn && !isConnected) {
                         conn = peer.connect(data.id);
                         conn.on('open', () => {
@@ -742,10 +832,8 @@
         function startHeartbeat() {
             if (heartbeatInterval) clearInterval(heartbeatInterval);
 
-            // Send immediate ping
             sendPing();
 
-            // Loop ping & cleanup
             heartbeatInterval = setInterval(() => {
                 sendPing();
                 cleanInactiveUsers();
@@ -760,7 +848,6 @@
 
         function cleanInactiveUsers() {
             const now = Date.now();
-            // Hapus user yang tidak mengirim ping dalam 7 detik terakhir
             activeUsers.forEach((lastSeen, userId) => {
                 if (now - lastSeen > 7000) {
                     activeUsers.delete(userId);
@@ -770,7 +857,6 @@
         }
 
         function updateOnlineUI() {
-            // Minimal 1 (pengguna itu sendiri)
             const count = Math.max(1, activeUsers.size); 
             document.getElementById('online-count-landing').innerText = `${count} Pengguna Online`;
             document.getElementById('online-count-chat').innerText = `${count} Online`;
@@ -825,6 +911,7 @@
             document.getElementById('partner-name').innerText = 'Orang Asing';
             document.getElementById('partner-age').innerText = 'Umur: -';
             document.getElementById('partner-avatar').src = 'https://via.placeholder.com/80?text=User';
+            endVideoCall();
         }
 
         function startSearch() {
@@ -850,6 +937,25 @@
                 conn.on('open', () => {
                     setupConnectionHandlers();
                 });
+            });
+
+            // Menerima panggilan video dari lawan
+            peer.on('call', async (call) => {
+                if (confirm('Terima panggilan video dari orang asing?')) {
+                    mediaCall = call;
+                    await getMedia();
+                    mediaCall.answer(localStream);
+                    videoContainer.classList.remove('hidden');
+
+                    mediaCall.on('stream', (stream) => {
+                        remoteStream = stream;
+                        remoteVideo.srcObject = stream;
+                    });
+
+                    mediaCall.on('close', () => {
+                        endVideoCall();
+                    });
+                }
             });
         }
 
@@ -911,6 +1017,76 @@
 
         function handleKeyPress(e) {
             if (e.key === 'Enter') sendMessage();
+        }
+
+        // --- VIDEO CALL ENGINE ---
+        async function getMedia() {
+            if (!localStream) {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    localVideo.srcObject = localStream;
+                } catch (err) {
+                    alert("Tidak dapat mengakses kamera atau mikrofon.");
+                }
+            }
+        }
+
+        async function startVideoCall() {
+            if (!conn) return;
+            await getMedia();
+            if (!localStream) return;
+
+            videoContainer.classList.remove('hidden');
+            addSystemMsg("Memulai panggilan video...");
+
+            mediaCall = peer.call(conn.peer, localStream);
+
+            mediaCall.on('stream', (stream) => {
+                remoteStream = stream;
+                remoteVideo.srcObject = stream;
+            });
+
+            mediaCall.on('close', () => {
+                endVideoCall();
+            });
+        }
+
+        function endVideoCall() {
+            if (mediaCall) {
+                mediaCall.close();
+                mediaCall = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            videoContainer.classList.add('hidden');
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+        }
+
+        function toggleMic() {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    const btn = document.getElementById('btn-toggle-mic');
+                    btn.innerText = audioTrack.enabled ? 'Mic On' : 'Mic Off';
+                    btn.classList.toggle('active', !audioTrack.enabled);
+                }
+            }
+        }
+
+        function toggleCam() {
+            if (localStream) {
+                const videoTrack = localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    videoTrack.enabled = !videoTrack.enabled;
+                    const btn = document.getElementById('btn-toggle-cam');
+                    btn.innerText = videoTrack.enabled ? 'Cam On' : 'Cam Off';
+                    btn.classList.toggle('active', !videoTrack.enabled);
+                }
+            }
         }
 
         // Jalankan Pengecekan Login Otomatis

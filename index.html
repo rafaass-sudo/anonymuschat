@@ -50,6 +50,7 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #334155;
+            flex-shrink: 0; /* Header tidak akan tertekan/mengecil */
         }
 
         header h2 {
@@ -85,18 +86,21 @@
             100% { opacity: 1; }
         }
 
+        /* --- AREA CHAT (DIBESARKAN & BEBAS KONTROL) --- */
         #chat-box {
             flex: 1;
-            padding: 16px;
+            padding: 16px 14px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
             background-color: #1e293b;
+            /* Memastikan ada ruang penggulungan yang cukup sebelum menyentuh batas input */
+            scroll-behavior: smooth;
         }
 
         .message {
-            max-width: 85%;
+            max-width: 88%; /* Diperlebar sedikit untuk tampilan HP */
             padding: 10px 14px;
             border-radius: 12px;
             font-size: 0.95rem;
@@ -135,17 +139,20 @@
             margin: 4px 0;
         }
 
+        /* --- AREA KONTROL DAN INPUT (TERKUNCI DI BAWAH) --- */
         #controls {
             display: flex;
-            padding: 12px 16px;
+            padding: 12px 14px;
             background-color: #0f172a;
             gap: 8px;
             border-top: 1px solid #334155;
+            flex-shrink: 0; /* Menjaga area tombol/input tidak tertutup atau tergeser */
+            align-items: center;
         }
 
         input {
             flex: 1;
-            padding: 12px 16px;
+            padding: 12px 14px;
             border-radius: 10px;
             border: 1px solid #334155;
             background-color: #1e293b;
@@ -153,6 +160,7 @@
             font-size: 0.95rem;
             outline: none;
             transition: border-color 0.2s;
+            min-width: 0; /* Mencegah input meluap dari kontainer di HP kecil */
         }
 
         input:focus {
@@ -166,7 +174,7 @@
         }
 
         button {
-            padding: 12px 18px;
+            padding: 12px 16px;
             border: none;
             border-radius: 10px;
             cursor: pointer;
@@ -174,6 +182,7 @@
             font-size: 0.9rem;
             transition: background-color 0.2s, opacity 0.2s;
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         button:active {
@@ -262,7 +271,6 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // --- SISTEM ONLINE COUNTER REALTIME ---
         function initPresenceSystem() {
             mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
                 will: {
@@ -328,13 +336,10 @@
             onlineCountEl.innerText = activeUsers.size;
         }
 
-        // --- SISTEM TOMBOL DINAMIS (START/STOP/NEXT) ---
         function handleActionClick() {
             if (isConnected) {
-                // Jika sedang terhubung, hentikan percakapan
                 stopChat(true);
             } else {
-                // Jika tidak terhubung, cari orang asing baru
                 startSearch();
             }
         }

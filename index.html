@@ -53,11 +53,18 @@
             line-height: 1.5;
         }
 
+        .btn-group-landing {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
         .btn-primary {
             background-color: #2563eb;
             color: #ffffff;
-            padding: 14px 32px;
-            font-size: 1.1rem;
+            padding: 14px 28px;
+            font-size: 1rem;
             font-weight: 700;
             border: none;
             border-radius: 12px;
@@ -68,6 +75,23 @@
 
         .btn-primary:hover {
             background-color: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: #334155;
+            color: #ffffff;
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 700;
+            border: 1px solid #475569;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background-color: #475569;
             transform: translateY(-2px);
         }
 
@@ -124,6 +148,20 @@
             color: #f8fafc;
             font-size: 0.95rem;
             outline: none;
+        }
+
+        .auth-switch-text {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 14px;
+        }
+
+        .auth-switch-text span {
+            color: #60a5fa;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: underline;
         }
 
         .avatar-preview {
@@ -183,7 +221,7 @@
             border: 1px solid #3b82f6;
         }
 
-        /* --- BARIS INFO PROFIL SAAT BEBAS NGOBROL (PARTNER & ME) --- */
+        /* --- BARIS INFO PROFIL SAAT TERHUBUNG CHAT --- */
         #partner-profile-bar {
             background-color: #0f172a;
             border-bottom: 1px solid #334155;
@@ -321,10 +359,13 @@
     <div id="landing-page">
         <h1 class="hero-title">Temukan Teman Bicara Baru</h1>
         <p class="hero-desc">Platform percakapan acak P2P langsung dari peramban Anda. Aman, cepat, dan privat.</p>
-        <button class="btn-primary" onclick="openAuthModal()">MASUK</button>
+        <div class="btn-group-landing">
+            <button class="btn-primary" onclick="openAuthModal('register')">DAFTAR</button>
+            <button class="btn-secondary" onclick="openAuthModal('login')">MASUK / LOGIN</button>
+        </div>
     </div>
 
-    <!-- 2. MODAL REGISTRASI & LOGIN -->
+    <!-- 2. MODAL REGISTRASI & LOGIN DINAMIS -->
     <div id="auth-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <h3 id="auth-title">Daftar Akun Baru</h3>
@@ -337,8 +378,12 @@
                     <label>Kata Sandi</label>
                     <input type="password" id="auth-password" required placeholder="••••••••">
                 </div>
-                <button type="submit" class="btn-primary" style="width:100%; margin-top:10px;">Daftar & Masuk</button>
+                <button type="submit" id="auth-btn-submit" class="btn-primary" style="width:100%; margin-top:10px;">Lanjut</button>
             </form>
+
+            <p class="auth-switch-text" id="auth-switch-wrapper">
+                Sudah punya akun? <span onclick="switchAuthMode('login')">Login di sini</span>
+            </p>
         </div>
     </div>
 
@@ -396,7 +441,8 @@
     </div>
 
     <script>
-        // Data Global User Profil
+        // State & Profil
+        let authMode = 'register'; // 'register' atau 'login'
         let myProfile = {
             name: '',
             dob: '',
@@ -426,10 +472,28 @@
         const btnSend = document.getElementById('btn-send');
         const btnAction = document.getElementById('btn-action');
 
-        // --- AUTHENTICATION & MODAL FLOW ---
-        function openAuthModal() {
+        // --- AUTHENTICATION FLOW ---
+        function openAuthModal(mode) {
             landingPage.classList.add('hidden');
             authModal.classList.remove('hidden');
+            switchAuthMode(mode);
+        }
+
+        function switchAuthMode(mode) {
+            authMode = mode;
+            const authTitle = document.getElementById('auth-title');
+            const authBtnSubmit = document.getElementById('auth-btn-submit');
+            const authSwitchWrapper = document.getElementById('auth-switch-wrapper');
+
+            if (authMode === 'register') {
+                authTitle.innerText = 'Daftar Akun Baru';
+                authBtnSubmit.innerText = 'Daftar & Lanjut';
+                authSwitchWrapper.innerHTML = 'Sudah punya akun? <span onclick="switchAuthMode(\'login\')">Login di sini</span>';
+            } else {
+                authTitle.innerText = 'Masuk / Login';
+                authBtnSubmit.innerText = 'Masuk Sekarang';
+                authSwitchWrapper.innerHTML = 'Belum punya akun? <span onclick="switchAuthMode(\'register\')">Daftar di sini</span>';
+            }
         }
 
         function handleAuthSubmit(e) {
@@ -438,7 +502,16 @@
             myProfile.name = username;
             
             authModal.classList.add('hidden');
-            openProfileModal();
+
+            if (authMode === 'register') {
+                // Jika daftar baru, wajib isi profil (foto, tgl lahir)
+                openProfileModal();
+            } else {
+                // Jika login, gunakan data default/tersimpan lalu langsung masuk ke aplikasi chat
+                document.getElementById('my-nav-avatar').src = myProfile.avatar;
+                appChat.classList.remove('hidden');
+                initMQTT();
+            }
         }
 
         function openProfileModal() {
@@ -460,6 +533,7 @@
         }
 
         function calculateAge(dobString) {
+            if (!dobString) return 0;
             const today = new Date();
             const birthDate = new Date(dobString);
             let age = today.getFullYear() - birthDate.getFullYear();
@@ -581,11 +655,11 @@
 
             conn.on('data', (payload) => {
                 if (payload.type === 'profile') {
-                    // Menerima profil dari lawan bicara
+                    // Menerima profil lawan bicara
                     partnerProfile = payload.data;
-                    document.getElementById('partner-name').innerText = partnerProfile.name;
-                    document.getElementById('partner-age').innerText = `Umur: ${partnerProfile.age} tahun`;
-                    document.getElementById('partner-avatar').src = partnerProfile.avatar;
+                    document.getElementById('partner-name').innerText = partnerProfile.name || 'Orang Asing';
+                    document.getElementById('partner-age').innerText = partnerProfile.age ? `Umur: ${partnerProfile.age} tahun` : 'Umur: -';
+                    document.getElementById('partner-avatar').src = partnerProfile.avatar || 'https://via.placeholder.com/80?text=User';
                 } else if (payload.type === 'chat') {
                     addMsg(payload.text, false);
                 }

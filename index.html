@@ -1,804 +1,305 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Anonymus Chat</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-
-        body {
-            background-color: #0f172a;
-            color: #f8fafc;
-            min-height: 100vh;
-            min-height: 100dvh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        /* --- DASHBOARD / LANDING PAGE --- */
-        #landing-page {
-            width: 100%;
-            max-width: 800px;
-            padding: 24px;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .hero-title {
-            font-size: 2.2rem;
-            font-weight: 800;
-            background: linear-gradient(to right, #3b82f6, #60a5fa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .hero-desc {
-            color: #94a3b8;
-            font-size: 1rem;
-            max-width: 500px;
-            line-height: 1.5;
-        }
-
-        .btn-group-landing {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .btn-primary {
-            background-color: #2563eb;
-            color: #ffffff;
-            padding: 14px 28px;
-            font-size: 1rem;
-            font-weight: 700;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-        }
-
-        .btn-primary:hover {
-            background-color: #1d4ed8;
-            transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-            background-color: #334155;
-            color: #ffffff;
-            padding: 14px 28px;
-            font-size: 1rem;
-            font-weight: 700;
-            border: 1px solid #475569;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-secondary:hover {
-            background-color: #475569;
-            transform: translateY(-2px);
-        }
-
-        /* --- MODAL DIALOGS (AUTH & PROFILE) --- */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(4px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-            padding: 16px;
-        }
-
-        .modal-card {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 16px;
-            width: 100%;
-            max-width: 400px;
-            padding: 24px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-card h3 {
-            margin-bottom: 16px;
-            text-align: center;
-            color: #f1f5f9;
-        }
-
-        .form-group {
-            margin-bottom: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            text-align: left;
-        }
-
-        .form-group label {
-            font-size: 0.85rem;
-            color: #94a3b8;
-        }
-
-        .form-group input {
-            padding: 10px 12px;
-            border-radius: 8px;
-            border: 1px solid #334155;
-            background-color: #0f172a;
-            color: #f8fafc;
-            font-size: 0.95rem;
-            outline: none;
-        }
-
-        .auth-switch-text {
-            font-size: 0.85rem;
-            color: #94a3b8;
-            text-align: center;
-            margin-top: 14px;
-        }
-
-        .auth-switch-text span {
-            color: #60a5fa;
-            cursor: pointer;
-            font-weight: 600;
-            text-decoration: underline;
-        }
-
-        .avatar-preview {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #2563eb;
-            margin: 0 auto 10px auto;
-            display: block;
-            background-color: #334155;
-        }
-
-        /* --- APP CHAT CONTAINER --- */
-        .app-container {
-            width: 100%;
-            height: 100vh;
-            height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            background-color: #1e293b;
-            overflow: hidden;
-        }
-
-        @media (min-width: 768px) {
-            .app-container {
-                max-width: 768px;
-                height: 90vh;
-                max-height: 850px;
-                border-radius: 16px;
-                border: 1px solid #334155;
-            }
-        }
-
-        header {
-            background-color: #0f172a;
-            padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #334155;
-            flex-shrink: 0;
-        }
-
-        .user-nav-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .user-nav-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            object-fit: cover;
-            cursor: pointer;
-            border: 1px solid #3b82f6;
-        }
-
-        .btn-logout {
-            background-color: #ef4444;
-            color: #ffffff;
-            padding: 6px 12px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .btn-logout:hover {
-            background-color: #dc2626;
-        }
-
-        /* --- BARIS INFO PROFIL SAAT TERHUBUNG CHAT --- */
-        #partner-profile-bar {
-            background-color: #0f172a;
-            border-bottom: 1px solid #334155;
-            padding: 10px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-
-        .profile-card-mini {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .profile-card-mini img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-            background-color: #334155;
-        }
-
-        .profile-details {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .profile-name {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #f8fafc;
-        }
-
-        .profile-age {
-            font-size: 0.75rem;
-            color: #94a3b8;
-        }
-
-        /* --- AREA CHAT --- */
-        #chat-box {
-            flex: 1;
-            padding: 16px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            background-color: #1e293b;
-        }
-
-        .message {
-            max-width: 85%;
-            padding: 10px 14px;
-            border-radius: 12px;
-            font-size: 0.95rem;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-
-        .my-msg {
-            background-color: #2563eb;
-            color: #ffffff;
-            align-self: flex-end;
-            border-bottom-right-radius: 2px;
-        }
-
-        .stranger-msg {
-            background-color: #334155;
-            color: #f8fafc;
-            align-self: flex-start;
-            border-bottom-left-radius: 2px;
-        }
-
-        .system-msg {
-            align-self: center;
-            background-color: rgba(51, 65, 85, 0.5);
-            color: #94a3b8;
-            font-size: 0.8rem;
-            padding: 6px 12px;
-            border-radius: 9999px;
-            text-align: center;
-        }
-
-        /* --- AREA INPUT --- */
-        #controls {
-            display: flex;
-            padding: 12px 14px;
-            background-color: #0f172a;
-            gap: 8px;
-            border-top: 1px solid #334155;
-            flex-shrink: 0;
-            align-items: center;
-        }
-
-        #controls input {
-            flex: 1;
-            padding: 12px 14px;
-            border-radius: 10px;
-            border: 1px solid #334155;
-            background-color: #1e293b;
-            color: #f8fafc;
-            font-size: 0.95rem;
-            outline: none;
-            min-width: 0;
-        }
-
-        #controls button {
-            padding: 12px 16px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9rem;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        .btn-start { background-color: #2563eb; color: #fff; }
-        .btn-stop { background-color: #dc2626; color: #fff; }
-        .btn-send { background-color: #10b981; color: #fff; }
-
-        button:disabled, input:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-    </style>
-
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aplikasi Chat dengan Custom Profil</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom scrollbar untuk area chat */
+    #chat-box::-webkit-scrollbar {
+      width: 6px;
+    }
+    #chat-box::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 3px;
+    }
+  </style>
 </head>
-<body>
+<body class="bg-gray-100 h-screen flex items-center justify-center p-4">
 
-    <!-- 1. LANDING PAGE / DASHBOARD UTAMA -->
-    <div id="landing-page">
-        <h1 class="hero-title">CARI TEMAN BARU MU DI WEB INI</h1>
-        <p class="hero-desc">Platform percakapan acak langsung dari peramban Anda. Aman, cepat, dan privat.</p>
-        <div class="btn-group-landing">
-            <button class="btn-primary" onclick="openAuthModal('register')">DAFTAR</button>
-            <button class="btn-secondary" onclick="openAuthModal('login')">LOGIN</button>
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col h-[650px]">
+    
+    <!-- HEADER CHAT (Tampilan Profil Aktif saat Ngobrol) -->
+    <div class="bg-indigo-600 p-4 text-white flex items-center justify-between shadow-md z-10">
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <img 
+            id="chat-header-avatar" 
+            src="https://via.placeholder.com/150" 
+            alt="Profil" 
+            class="w-11 h-11 rounded-full object-cover border-2 border-white shadow-sm"
+            onerror="this.onerror=null;this.src='https://via.placeholder.com/150';"
+          />
+          <span class="w-3 h-3 bg-green-400 border-2 border-indigo-600 rounded-full absolute bottom-0 right-0"></span>
         </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <h2 id="chat-header-name" class="font-bold text-base leading-tight">Pengguna</h2>
+            <span id="chat-header-age-badge" class="bg-indigo-500 text-indigo-100 text-xs px-2 py-0.5 rounded-full font-medium">
+              <span id="chat-header-age">0</span> thn
+            </span>
+          </div>
+          <span class="text-xs text-indigo-200 mt-0.5">Online</span>
+        </div>
+      </div>
+      
+      <!-- Tombol Pengaturan Profil -->
+      <button 
+        onclick="toggleProfileModal(true)" 
+        class="bg-indigo-700 hover:bg-indigo-800 p-2 rounded-lg transition text-xs font-medium flex items-center gap-1"
+      >
+        <span>✏️</span> Edit
+      </button>
     </div>
 
-    <!-- 2. MODAL REGISTRASI & LOGIN DINAMIS -->
-    <div id="auth-modal" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3 id="auth-title">Daftar Akun Baru</h3>
-            <form onsubmit="handleAuthSubmit(event)">
-                <div class="form-group">
-                    <label>Username / Email</label>
-                    <input type="text" id="auth-username" required placeholder="Masukkan nama pengguna">
-                </div>
-                <div class="form-group">
-                    <label>Kata Sandi</label>
-                    <input type="password" id="auth-password" required placeholder="••••••••">
-                </div>
-                <button type="submit" id="auth-btn-submit" class="btn-primary" style="width:100%; margin-top:10px;">Lanjut</button>
-            </form>
-
-            <p class="auth-switch-text" id="auth-switch-wrapper">
-                Sudah punya akun? <span onclick="switchAuthMode('login')">Login di sini</span>
-            </p>
-        </div>
+    <!-- AREA OBROLAN / CHAT BOX -->
+    <div id="chat-box" class="flex-1 p-4 overflow-y-auto bg-slate-50 flex flex-col gap-3">
+      <!-- Pesan otomatis/sapaan awal -->
+      <div class="text-center my-2">
+        <span class="text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full">Obrolan Dimulai</span>
+      </div>
     </div>
 
-    <!-- 3. MODAL EDIT PROFIL -->
-    <div id="profile-modal" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3>Atur Profil Anda</h3>
-            <form onsubmit="saveProfile(event)">
-                <img id="avatar-preview" class="avatar-preview" src="https://via.placeholder.com/80?text=Foto" alt="Preview">
-                <div class="form-group">
-                    <label>Foto Profil</label>
-                    <input type="file" id="input-avatar" accept="image/*" onchange="previewImage(event)">
-                </div>
-                <div class="form-group">
-                    <label>Nama Tampilan</label>
-                    <input type="text" id="input-name" required placeholder="Nama Anda">
-                </div>
-                <div class="form-group">
-                    <label>Tanggal Lahir</label>
-                    <input type="date" id="input-dob" required>
-                </div>
-                <button type="submit" class="btn-primary" style="width:100%; margin-top:10px;">Simpan & Mulai Chat</button>
-            </form>
+    <!-- INPUT PESAN -->
+    <form id="chat-form" onsubmit="handleSendMessage(event)" class="p-3 bg-white border-t flex items-center gap-2">
+      <input 
+        type="text" 
+        id="message-input" 
+        placeholder="Ketik pesan di sini..." 
+        class="flex-1 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50"
+        required
+      />
+      <button 
+        type="submit" 
+        class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium text-sm hover:bg-indigo-700 transition"
+      >
+        Kirim
+      </button>
+    </form>
+
+  </div>
+
+  <!-- MODAL CUSTOM PROFIL -->
+  <div id="profile-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+      <h3 class="text-lg font-bold text-gray-800 mb-4">Custom Profil Anda</h3>
+      
+      <form onsubmit="handleSaveProfile(event)" class="flex flex-col gap-4">
+        <!-- Input Nama -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Nama Lengkap</label>
+          <input 
+            type="text" 
+            id="input-name" 
+            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+            placeholder="Masukkan Nama"
+            required
+          />
         </div>
+
+        <!-- Input Umur -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Umur (Tahun)</label>
+          <input 
+            type="number" 
+            id="input-age" 
+            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+            placeholder="Masukkan Umur"
+            min="1" 
+            max="120"
+            required
+          />
+        </div>
+
+        <!-- Input Foto Profil (Upload File) -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Foto Profil</label>
+          <input 
+            type="file" 
+            id="input-avatar" 
+            accept="image/*" 
+            onchange="previewImage(event)"
+            class="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+          />
+        </div>
+
+        <!-- Preview Foto -->
+        <div class="flex justify-center my-1">
+          <img 
+            id="preview-avatar" 
+            src="https://via.placeholder.com/150" 
+            alt="Preview" 
+            class="w-16 h-16 rounded-full object-cover border-2 border-indigo-500"
+          />
+        </div>
+
+        <!-- Tombol Aksi -->
+        <div class="flex gap-2 mt-2">
+          <button 
+            type="button" 
+            onclick="toggleProfileModal(false)" 
+            class="flex-1 border text-gray-600 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button 
+            type="submit" 
+            class="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition"
+          >
+            Simpan Profil
+          </button>
+        </div>
+      </form>
     </div>
+  </div>
 
-    <!-- 4. APPS UTAMA (CHAT INTERFACE) -->
-    <div id="app-chat" class="app-container hidden">
-        <header>
-            <h2>AnonChat</h2>
-            <div class="user-nav-info">
-                <img id="my-nav-avatar" class="user-nav-avatar" src="" title="Edit Profil" onclick="openProfileModal()">
-                <button class="btn-logout" onclick="handleLogout()">Log Out</button>
-            </div>
-        </header>
+  <script>
+    // 1. MASTER STATE PROFIL (Diambil dari LocalStorage agar tersimpan permanen)
+    let userProfile = {
+      name: "User Custom",
+      age: 20,
+      avatar: "https://via.placeholder.com/150"
+    };
 
-        <div id="partner-profile-bar" class="hidden">
-            <div class="profile-card-mini">
-                <img id="partner-avatar" src="" alt="Lawan">
-                <div class="profile-details">
-                    <span id="partner-name" class="profile-name">Orang Asing</span>
-                    <span id="partner-age" class="profile-age">Umur: -</span>
-                </div>
-            </div>
-            <span style="font-size:0.75rem; color:#10b981; font-weight:bold;">Terhubung</span>
-        </div>
+    // Variabel temporary untuk preview gambar Base64
+    let tempAvatarBase64 = null;
 
-        <div id="chat-box"></div>
+    // 2. INISIALISASI SAAT HALAMAN DIMUAT
+    window.addEventListener('DOMContentLoaded', () => {
+      loadProfileFromStorage();
+      renderHeaderProfile();
+    });
 
-        <div id="controls">
-            <button id="btn-action" class="btn-start" onclick="handleActionClick()">Start</button>
-            <input type="text" id="msg-input" placeholder="Ketik pesan..." disabled onkeypress="handleKeyPress(event)">
-            <button id="btn-send" class="btn-send" onclick="sendMessage()" disabled>Kirim</button>
-        </div>
-    </div>
+    // Load data profil dari localStorage
+    function loadProfileFromStorage() {
+      const savedData = localStorage.getItem('app_user_profile');
+      if (savedData) {
+        try {
+          userProfile = JSON.parse(savedData);
+        } catch (e) {
+          console.error("Gagal membaca profil dari localStorage", e);
+        }
+      }
+    }
 
-    <script>
-        // State & Profil
-        let authMode = 'register';
-        let myProfile = {
-            name: '',
-            dob: '',
-            age: 0,
-            avatar: 'https://via.placeholder.com/80?text=User'
+    // 3. FUNGSI UTAMA: UPDATE RENDER HEADER CHAT (Menjamin Profil Tidak Hilang)
+    function renderHeaderProfile() {
+      const nameEl = document.getElementById('chat-header-name');
+      const ageEl = document.getElementById('chat-header-age');
+      const avatarEl = document.getElementById('chat-header-avatar');
+
+      // Set data dengan proteksi fallback
+      nameEl.textContent = userProfile.name || "Tanpa Nama";
+      ageEl.textContent = userProfile.age || "0";
+      avatarEl.src = userProfile.avatar || "https://via.placeholder.com/150";
+    }
+
+    // Toggle Modal Pengaturan Profil
+    function toggleProfileModal(show) {
+      const modal = document.getElementById('profile-modal');
+      if (show) {
+        // Isi form modal dengan data saat ini
+        document.getElementById('input-name').value = userProfile.name;
+        document.getElementById('input-age').value = userProfile.age;
+        document.getElementById('preview-avatar').src = userProfile.avatar;
+        tempAvatarBase64 = userProfile.avatar; // Set nilai awal
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // Preview foto yang diupload dan konversi ke Base64
+    function previewImage(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          tempAvatarBase64 = e.target.result;
+          document.getElementById('preview-avatar').src = tempAvatarBase64;
         };
+        reader.readAsDataURL(file);
+      }
+    }
 
-        let partnerProfile = null;
+    // SIMPAN CUSTOM PROFIL
+    function handleSaveProfile(event) {
+      event.preventDefault();
 
-        // P2P & Signaling Variables
-        const SIGNAL_TOPIC = "anonchat_queue_public_v3";
-        let peer = null;
-        let conn = null;
-        let mqttClient = null;
-        let myPeerId = "user_" + Math.random().toString(36).substr(2, 8);
-        let isConnected = false;
+      // Ambil nilai dari form
+      const newName = document.getElementById('input-name').value.trim();
+      const newAge = document.getElementById('input-age').value;
 
-        // DOM Elements
-        const landingPage = document.getElementById('landing-page');
-        const authModal = document.getElementById('auth-modal');
-        const profileModal = document.getElementById('profile-modal');
-        const appChat = document.getElementById('app-chat');
-        const partnerBar = document.getElementById('partner-profile-bar');
+      // Update Master State Profil
+      userProfile = {
+        name: newName || "Tanpa Nama",
+        age: newAge || 0,
+        avatar: tempAvatarBase64 || userProfile.avatar
+      };
 
-        const chatBox = document.getElementById('chat-box');
-        const msgInput = document.getElementById('msg-input');
-        const btnSend = document.getElementById('btn-send');
-        const btnAction = document.getElementById('btn-action');
+      // Simpan ke localStorage agar tidak hilang saat refresh
+      localStorage.setItem('app_user_profile', JSON.stringify(userProfile));
 
-        // --- MANAJEMEN DEPO PENYIMPANAN PERSISTEN (STORAGE & COOKIES FALLBACK) ---
-        function setStorageItem(key, value) {
-            try {
-                localStorage.setItem(key, value);
-            } catch (e) {}
-            // Fallback ke Cookie jika localStorage diblokir/gagal
-            const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
-            document.cookie = `${key}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
-        }
+      // Re-render Header Chat seketika
+      renderHeaderProfile();
 
-        function getStorageItem(key) {
-            try {
-                const item = localStorage.getItem(key);
-                if (item) return item;
-            } catch (e) {}
-            
-            // Ambil dari Cookie
-            const nameEQ = key + "=";
-            const ca = document.cookie.split(';');
-            for (let i = 0; i < ca.length; i++) {
-                let c = ca[i].trim();
-                if (c.indexOf(nameEQ) === 0) {
-                    return decodeURIComponent(c.substring(nameEQ.length, c.length));
-                }
-            }
-            return null;
-        }
+      // Tutup Modal
+      toggleProfileModal(false);
+    }
 
-        function removeStorageItem(key) {
-            try {
-                localStorage.removeItem(key);
-            } catch (e) {}
-            document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-        }
+    // KIRIM PESAN CHAT
+    function handleSendMessage(event) {
+      event.preventDefault();
+      const inputEl = document.getElementById('message-input');
+      const text = inputEl.value.trim();
 
-        function checkAutoLogin() {
-            const savedProfile = getStorageItem('anonchat_user_profile');
-            const isLoggedIn = getStorageItem('anonchat_is_loggedin');
+      if (!text) return;
 
-            if (isLoggedIn === 'true' && savedProfile) {
-                try {
-                    myProfile = JSON.parse(savedProfile);
-                    enterChatApp();
-                } catch(e) {}
-            }
-        }
+      const chatBox = document.getElementById('chat-box');
 
-        function enterChatApp() {
-            landingPage.classList.add('hidden');
-            authModal.classList.add('hidden');
-            profileModal.classList.add('hidden');
-            
-            document.getElementById('my-nav-avatar').src = myProfile.avatar || 'https://via.placeholder.com/80?text=User';
-            appChat.classList.remove('hidden');
+      // Buat Elemen Bubble Chat dengan Menggunakan Data Profil Aktif
+      const messageElement = document.createElement('div');
+      messageElement.className = "flex items-end gap-2 justify-end my-1";
 
-            initMQTT();
-        }
+      messageElement.innerHTML = `
+        <div class="flex flex-col items-end max-w-[80%]">
+          <div class="flex items-center gap-1.5 mb-1">
+            <span class="text-[10px] text-gray-500 font-semibold">${userProfile.name} (${userProfile.age} thn)</span>
+          </div>
+          <div class="bg-indigo-600 text-white px-3.5 py-2 rounded-2xl rounded-tr-none text-sm shadow-sm break-words">
+            ${escapeHTML(text)}
+          </div>
+        </div>
+        <img 
+          src="${userProfile.avatar}" 
+          alt="${userProfile.name}" 
+          class="w-7 h-7 rounded-full object-cover border border-gray-200 mb-0.5"
+          onerror="this.onerror=null;this.src='https://via.placeholder.com/150';"
+        />
+      `;
 
-        // --- AUTHENTICATION FLOW ---
-        function openAuthModal(mode) {
-            landingPage.classList.add('hidden');
-            authModal.classList.remove('hidden');
-            switchAuthMode(mode);
-        }
+      chatBox.appendChild(messageElement);
+      
+      // Auto Scroll ke bawah
+      chatBox.scrollTop = chatBox.scrollHeight;
 
-        function switchAuthMode(mode) {
-            authMode = mode;
-            const authTitle = document.getElementById('auth-title');
-            const authBtnSubmit = document.getElementById('auth-btn-submit');
-            const authSwitchWrapper = document.getElementById('auth-switch-wrapper');
+      // Reset Input
+      inputEl.value = '';
+    }
 
-            if (authMode === 'register') {
-                authTitle.innerText = 'Daftar Akun Baru';
-                authBtnSubmit.innerText = 'Daftar & Lanjut';
-                authSwitchWrapper.innerHTML = 'Sudah punya akun? <span onclick="switchAuthMode(\'login\')">Login di sini</span>';
-            } else {
-                authTitle.innerText = 'Masuk / Login';
-                authBtnSubmit.innerText = 'Masuk Sekarang';
-                authSwitchWrapper.innerHTML = 'Belum punya akun? <span onclick="switchAuthMode(\'register\')">Daftar di sini</span>';
-            }
-        }
-
-        function handleAuthSubmit(e) {
-            e.preventDefault();
-            const username = document.getElementById('auth-username').value;
-            myProfile.name = username;
-            
-            authModal.classList.add('hidden');
-
-            if (authMode === 'register') {
-                openProfileModal();
-            } else {
-                setStorageItem('anonchat_is_loggedin', 'true');
-                setStorageItem('anonchat_user_profile', JSON.stringify(myProfile));
-                enterChatApp();
-            }
-        }
-
-        // LOG OUT
-        function handleLogout() {
-            stopChat(false);
-
-            if (mqttClient) {
-                mqttClient.end();
-                mqttClient = null;
-            }
-            if (peer) {
-                peer.destroy();
-                peer = null;
-            }
-
-            removeStorageItem('anonchat_is_loggedin');
-            removeStorageItem('anonchat_user_profile');
-
-            document.getElementById('auth-username').value = '';
-            document.getElementById('auth-password').value = '';
-            myProfile = {
-                name: '',
-                dob: '',
-                age: 0,
-                avatar: 'https://via.placeholder.com/80?text=User'
-            };
-
-            chatBox.innerHTML = '';
-            appChat.classList.add('hidden');
-            landingPage.classList.remove('hidden');
-        }
-
-        function openProfileModal() {
-            document.getElementById('input-name').value = myProfile.name || '';
-            document.getElementById('input-dob').value = myProfile.dob || '';
-            document.getElementById('avatar-preview').src = myProfile.avatar;
-            profileModal.classList.remove('hidden');
-        }
-
-        function previewImage(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('avatar-preview').src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        function calculateAge(dobString) {
-            if (!dobString) return 0;
-            const today = new Date();
-            const birthDate = new Date(dobString);
-            let age = today.getFullYear() - birthDate.getFullYear();
-            const m = today.getMonth() - birthDate.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-                age--;
-            }
-            return age;
-        }
-
-        function saveProfile(e) {
-            e.preventDefault();
-            myProfile.name = document.getElementById('input-name').value;
-            myProfile.dob = document.getElementById('input-dob').value;
-            myProfile.age = calculateAge(myProfile.dob);
-            myProfile.avatar = document.getElementById('avatar-preview').src;
-
-            setStorageItem('anonchat_is_loggedin', 'true');
-            setStorageItem('anonchat_user_profile', JSON.stringify(myProfile));
-
-            enterChatApp();
-        }
-
-        // --- P2P CHAT ENGINE ---
-        function addSystemMsg(text) {
-            const div = document.createElement('div');
-            div.className = 'message system-msg';
-            div.innerText = text;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function addMsg(text, isMe) {
-            const div = document.createElement('div');
-            div.className = `message ${isMe ? 'my-msg' : 'stranger-msg'}`;
-            div.innerText = text;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function initMQTT() {
-            if (mqttClient && mqttClient.connected) return;
-
-            mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
-
-            mqttClient.on('connect', () => {
-                mqttClient.subscribe(SIGNAL_TOPIC);
-            });
-
-            mqttClient.on('message', (topic, message) => {
-                try {
-                    const data = JSON.parse(message.toString());
-                    if (data.action === 'search' && data.id !== myPeerId && !conn && !isConnected) {
-                        conn = peer.connect(data.id);
-                        conn.on('open', () => {
-                            setupConnectionHandlers();
-                        });
-                    }
-                } catch(e) {}
-            });
-        }
-
-        function handleActionClick() {
-            if (isConnected) {
-                stopChat(true);
-            } else {
-                startSearch();
-            }
-        }
-
-        function setActionState(state) {
-            if (state === 'connected') {
-                btnAction.innerText = 'Stop';
-                btnAction.className = 'btn-stop';
-                isConnected = true;
-                msgInput.disabled = false;
-                btnSend.disabled = false;
-                partnerBar.classList.remove('hidden');
-            } else {
-                btnAction.innerText = 'Start';
-                btnAction.className = 'btn-start';
-                isConnected = false;
-                msgInput.disabled = true;
-                btnSend.disabled = true;
-                partnerBar.classList.add('hidden');
-            }
-        }
-
-        function startSearch() {
-            if (conn) conn.close();
-            if (peer) peer.destroy();
-
-            chatBox.innerHTML = '';
-            addSystemMsg('Mencari lawan bicara...');
-            setActionState('disconnected');
-            btnAction.innerText = 'Mencari...';
-
-            peer = new Peer(myPeerId);
-
-            peer.on('open', () => {
-                if (mqttClient && mqttClient.connected) {
-                    mqttClient.publish(SIGNAL_TOPIC, JSON.stringify({ id: myPeerId, action: 'search' }));
-                }
-            });
-
-            peer.on('connection', (incomingConn) => {
-                if (isConnected) return;
-                conn = incomingConn;
-                setupConnectionHandlers();
-            });
-        }
-
-        function setupConnectionHandlers() {
-            setActionState('connected');
-            addSystemMsg('Terhubung dengan orang asing!');
-
-            conn.send({ type: 'profile', data: myProfile });
-
-            conn.on('data', (payload) => {
-                if (payload.type === 'profile') {
-                    partnerProfile = payload.data;
-                    document.getElementById('partner-name').innerText = partnerProfile.name || 'Orang Asing';
-                    document.getElementById('partner-age').innerText = partnerProfile.age ? `Umur: ${partnerProfile.age} tahun` : 'Umur: -';
-                    document.getElementById('partner-avatar').src = partnerProfile.avatar || 'https://via.placeholder.com/80?text=User';
-                } else if (payload.type === 'chat') {
-                    addMsg(payload.text, false);
-                }
-            });
-
-            conn.on('close', () => {
-                if (isConnected) {
-                    addSystemMsg('Lawan bicara telah memutuskan percakapan.');
-                    stopChat(false);
-                }
-            });
-        }
-
-        function stopChat(initiatedByMe) {
-            if (conn) {
-                conn.close();
-                conn = null;
-            }
-            setActionState('disconnected');
-            if (initiatedByMe) {
-                addSystemMsg('Anda telah memutuskan obrolan.');
-            }
-        }
-
-        function sendMessage() {
-            const text = msgInput.value.trim();
-            if (text && conn && conn.open) {
-                addMsg(text, true);
-                conn.send({ type: 'chat', text: text });
-                msgInput.value = '';
-            }
-        }
-
-        function handleKeyPress(e) {
-            if (e.key === 'Enter') sendMessage();
-        }
-
-        // Jalankan Pengecekan Login Otomatis
-        document.addEventListener('DOMContentLoaded', checkAutoLogin);
-    </script>
+    // Helper mencegah XSS Inject
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag] || tag)
+      );
+    }
+  </script>
 </body>
 </html>

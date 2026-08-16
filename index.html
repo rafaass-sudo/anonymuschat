@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anonymous P2P Chat</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { display: flex; flex-direction: column; height: 100vh; background: #121212; color: #fff; }
+        header { background: #1f1f1f; padding: 15px; text-align: center; border-bottom: 1px solid #333; }
+        #chat-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 75%; padding: 10px 14px; border-radius: 8px; font-size: 14px; word-wrap: break-word; }
+        .my-msg { background: #007bff; align-self: flex-end; }
+        .stranger-msg { background: #333; align-self: flex-start; }
+        .system-msg { align-self: center; background: transparent; color: #888; font-size: 12px; }
+        #controls { display: flex; padding: 10px; background: #1f1f1f; gap: 8px; }
+        input { flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; outline: none; }
+        button { padding: 12px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        #btn-send { background: #28a745; color: #fff; }
+        #btn-start { background: #007bff; color: #fff; }
+    </style>
+
+    <!-- Library WebRTC P2P (PeerJS CDN Gratis) -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+    <header>
+        <h2>Anonymous P2P Chat</h2>
+    </header>
+
+    <div id="chat-box"></div>
+
+    <div id="controls">
+        <button id="btn-start" onclick="startSearch()">Start / Connect</button>
+        <input type="text" id="msg-input" placeholder="Ketik pesan..." disabled onkeypress="handleKeyPress(event)">
+        <button id="btn-send" onclick="sendMessage()" disabled>Kirim</button>
+    </div>
+
+    <script>
+        // Prefix ID publik untuk ruang obrolan bersama di server PeerJS
+        const ROOM_PREFIX = "anonchat_p2p_room_";
+        
+        let peer = null;
+        let conn = null;
+        let myPeerId = "";
+
+        const chatBox = document.getElementById('chat-box');
+        const msgInput = document.getElementById('msg-input');
+        const btnSend = document.getElementById('btn-send');
+
+        function addSystemMsg(text) {
+            const div = document.createElement('div');
+            div.className = 'message system-msg';
+            div.innerText = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function addMsg(text, isMe) {
+            const div = document.createElement('div');
+            div.className = `message ${isMe ? 'my-msg' : 'stranger-msg'}`;
+            div.innerText = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function startSearch() {
+            if (conn) conn.close();
+            if (peer) peer.destroy();
+
+            chatBox.innerHTML = '';
+            addSystemMsg('Menghubungkan ke jaringan P2P...');
+            msgInput.disabled = true;
+            btnSend.disabled = true;
+
+            // Generate ID acak untuk user
+            myPeerId = ROOM_PREFIX + Math.floor(100000 + Math.random() * 900000);
+
+            // Inisialisasi PeerJS menggunakan Server Publik Bawaan
+            peer = new Peer(myPeerId);
+
+            peer.on('open', (id) => {
+                addSystemMsg('Mencari lawan bicara yang aktif...');
+                tryConnectToOthers();
+            });
+
+            // Mendengarkan jika ada lawan bicara yang menghubungi duluan
+            peer.on('connection', (incomingConn) => {
+                conn = incomingConn;
+                setupConnectionHandlers();
+            });
+
+            peer.on('error', (err) => {
+                console.log(err);
+                tryConnectToOthers();
+            });
+        }
+
+        function tryConnectToOthers() {
+            // Mencoba mencari ID lain dengan pola prefix acak
+            const targetNumber = Math.floor(100000 + Math.random() * 900000);
+            const targetPeerId = ROOM_PREFIX + targetNumber;
+
+            if (targetPeerId === myPeerId) {
+                setTimeout(tryConnectToOthers, 1000);
+                return;
+            }
+
+            conn = peer.connect(targetPeerId);
+
+            conn.on('open', () => {
+                setupConnectionHandlers();
+            });
+
+            // Jika ID target tidak ditemukan, terus coba pasangkan
+            setTimeout(() => {
+                if (!conn || !conn.open) {
+                    tryConnectToOthers();
+                }
+            }, 2500);
+        }
+
+        function setupConnectionHandlers() {
+            addSystemMsg('Terhubung langsung (P2P) dengan orang asing! Mulai obrolan.');
+            msgInput.disabled = false;
+            btnSend.disabled = false;
+
+            conn.on('data', (data) => {
+                addMsg(data, false);
+            });
+
+            conn.on('close', () => {
+                addSystemMsg('Lawan bicara telah terputus.');
+                msgInput.disabled = true;
+                btnSend.disabled = true;
+            });
+        }
+
+        function sendMessage() {
+            const text = msgInput.value.trim();
+            if (text && conn && conn.open) {
+                addMsg(text, true);
+                conn.send(text);
+                msgInput.value = '';
+            }
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+    </script>
+</body>
+</html>

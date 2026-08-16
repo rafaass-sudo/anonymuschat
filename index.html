@@ -7,7 +7,33 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { display: flex; flex-direction: column; height: 100vh; background: #121212; color: #fff; }
-        header { background: #1f1f1f; padding: 15px; text-align: center; border-bottom: 1px solid #333; }
+        header { 
+            background: #1f1f1f; 
+            padding: 15px; 
+            text-align: center; 
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .online-badge {
+            background: #28a745;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .online-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #fff;
+            border-radius: 50%;
+            display: inline-block;
+        }
         #chat-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         .message { max-width: 75%; padding: 10px 14px; border-radius: 8px; font-size: 14px; word-wrap: break-word; }
         .my-msg { background: #007bff; align-self: flex-end; }
@@ -20,7 +46,7 @@
         #btn-start { background: #007bff; color: #fff; }
     </style>
 
-    <!-- PeerJS & MQTT Client Client-side -->
+    <!-- PeerJS & MQTT Client -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
@@ -28,6 +54,10 @@
 
     <header>
         <h2>Anonymous P2P Chat</h2>
+        <div class="online-badge">
+            <span class="online-dot"></span>
+            <span id="online-count">0</span> Online
+        </div>
     </header>
 
     <div id="chat-box"></div>
@@ -39,15 +69,21 @@
     </div>
 
     <script>
-        const SIGNAL_TOPIC = "anonchat_queue_public_v1";
+        const SIGNAL_TOPIC = "anonchat_queue_public_v2";
+        const PRESENCE_TOPIC = "anonchat_presence_v2/";
+        
         let peer = null;
         let conn = null;
         let mqttClient = null;
         let myPeerId = "user_" + Math.random().toString(36).substr(2, 8);
+        
+        let activeUsers = new Map();
+        let heartbeatInterval = null;
 
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg-input');
         const btnSend = document.getElementById('btn-send');
+        const onlineCountEl = document.getElementById('online-count');
 
         function addSystemMsg(text) {
             const div = document.createElement('div');
@@ -65,56 +101,99 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
+        // --- SISTEM ONLINE COUNTER REALTIME ---
+        function initPresenceSystem() {
+            mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+                will: {
+                    topic: PRESENCE_TOPIC + myPeerId,
+                    payload: '',
+                    qos: 0,
+                    retain: true
+                }
+            });
+
+            mqttClient.on('connect', () => {
+                // Subscribe topik pendaftaran pencarian & presensi online
+                mqttClient.subscribe(SIGNAL_TOPIC);
+                mqttClient.subscribe(PRESENCE_TOPIC + '+');
+
+                // Kirim sinyal bahwa user ini online
+                sendHeartbeat();
+                heartbeatInterval = setInterval(sendHeartbeat, 5000);
+            });
+
+            mqttClient.on('message', (topic, message) => {
+                const payloadStr = message.toString();
+
+                // Handler untuk perhitungan user online
+                if (topic.startsWith(PRESENCE_TOPIC)) {
+                    const userId = topic.replace(PRESENCE_TOPIC, '');
+
+                    if (payloadStr === '') {
+                        activeUsers.delete(userId);
+                    } else {
+                        activeUsers.set(userId, Date.now());
+                    }
+                    updateOnlineCount();
+                    return;
+                }
+
+                // Handler untuk matching chat
+                try {
+                    const data = JSON.parse(payloadStr);
+                    if (data.action === 'search' && data.id !== myPeerId && !conn) {
+                        conn = peer.connect(data.id);
+                        conn.on('open', () => {
+                            setupConnectionHandlers();
+                        });
+                    }
+                } catch(e) {}
+            });
+
+            // Pembersihan berkala jika ada user yang disconnect tanpa 'will'
+            setInterval(() => {
+                const now = Date.now();
+                activeUsers.forEach((lastSeen, uId) => {
+                    if (now - lastSeen > 12000) {
+                        activeUsers.delete(uId);
+                    }
+                });
+                updateOnlineCount();
+            }, 5000);
+        }
+
+        function sendHeartbeat() {
+            if (mqttClient && mqttClient.connected) {
+                mqttClient.publish(PRESENCE_TOPIC + myPeerId, '1', { retain: true });
+            }
+        }
+
+        function updateOnlineCount() {
+            onlineCountEl.innerText = activeUsers.size;
+        }
+
+        // --- SISTEM P2P CHAT ---
         function startSearch() {
             if (conn) conn.close();
             if (peer) peer.destroy();
-            if (mqttClient) mqttClient.end();
 
             chatBox.innerHTML = '';
             addSystemMsg('Menyiapkan koneksi P2P...');
             msgInput.disabled = true;
             btnSend.disabled = true;
 
-            // Inisialisasi PeerJS
             peer = new Peer(myPeerId);
 
             peer.on('open', (id) => {
                 addSystemMsg('Mencari lawan bicara...');
-                connectToSignalServer();
+                if (mqttClient && mqttClient.connected) {
+                    mqttClient.publish(SIGNAL_TOPIC, JSON.stringify({ id: myPeerId, action: 'search' }));
+                }
             });
 
             peer.on('connection', (incomingConn) => {
                 conn = incomingConn;
-                if (mqttClient) mqttClient.end();
                 setupConnectionHandlers();
-            });
-        }
-
-        function connectToSignalServer() {
-            // Broker MQTT Publik Gratis tanpa login untuk matching antrean
-            mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
-
-            mqttClient.on('connect', () => {
-                mqttClient.subscribe(SIGNAL_TOPIC);
-                // Siarkan ID kita ke pengguna lain
-                mqttClient.publish(SIGNAL_TOPIC, JSON.stringify({ id: myPeerId, action: 'search' }));
-            });
-
-            mqttClient.on('message', (topic, message) => {
-                try {
-                    const data = JSON.parse(message.toString());
-                    
-                    // Jika ada user lain yang mengirimkan pencarian dan bukan diri sendiri
-                    if (data.action === 'search' && data.id !== myPeerId && !conn) {
-                        // Hubungi ID tersebut via WebRTC Direct
-                        conn = peer.connect(data.id);
-                        
-                        conn.on('open', () => {
-                            if (mqttClient) mqttClient.end();
-                            setupConnectionHandlers();
-                        });
-                    }
-                } catch(e) {}
             });
         }
 
@@ -146,6 +225,9 @@
         function handleKeyPress(e) {
             if (e.key === 'Enter') sendMessage();
         }
+
+        // Jalankan pelacak presensi saat halaman dimuat
+        window.onload = initPresenceSystem;
     </script>
 </body>
 </html>

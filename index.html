@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Anonymous Chat Realtime</title>
+    <title>Anonymous Chat Rafzx</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { display: flex; flex-direction: column; height: 100vh; background: #121212; color: #fff; }
@@ -53,7 +53,7 @@
 <body>
 
     <header>
-        <h2>Anonymous P2P Chat</h2>
+        <h2>Anonymous Chat Rafzx</h2>
         <div class="online-badge">
             <span class="online-dot"></span>
             <span id="online-count">0</span> Online
@@ -178,7 +178,7 @@
             if (peer) peer.destroy();
 
             chatBox.innerHTML = '';
-            addSystemMsg('Menyiapkan koneksi P2P...');
+            addSystemMsg('Mencari orang...');
             msgInput.disabled = true;
             btnSend.disabled = true;
 
@@ -198,7 +198,7 @@
         }
 
         function setupConnectionHandlers() {
-            addSystemMsg('Terhubung langsung (P2P) dengan orang asing!');
+            addSystemMsg('Terhubung langsung dengan orang asing!');
             msgInput.disabled = false;
             btnSend.disabled = false;
 

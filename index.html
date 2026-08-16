@@ -209,7 +209,7 @@
         .user-nav-info {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         .user-nav-avatar {
@@ -219,6 +219,23 @@
             object-fit: cover;
             cursor: pointer;
             border: 1px solid #3b82f6;
+        }
+
+        /* TOMBOL LOG OUT */
+        .btn-logout {
+            background-color: #ef4444;
+            color: #ffffff;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-logout:hover {
+            background-color: #dc2626;
         }
 
         /* --- BARIS INFO PROFIL SAAT TERHUBUNG CHAT --- */
@@ -416,6 +433,7 @@
             <h2>AnonChat</h2>
             <div class="user-nav-info">
                 <img id="my-nav-avatar" class="user-nav-avatar" src="" title="Edit Profil" onclick="openProfileModal()">
+                <button class="btn-logout" onclick="handleLogout()">Log Out</button>
             </div>
         </header>
 
@@ -442,7 +460,7 @@
 
     <script>
         // State & Profil
-        let authMode = 'register'; // 'register' atau 'login'
+        let authMode = 'register';
         let myProfile = {
             name: '',
             dob: '',
@@ -504,14 +522,45 @@
             authModal.classList.add('hidden');
 
             if (authMode === 'register') {
-                // Jika daftar baru, wajib isi profil (foto, tgl lahir)
                 openProfileModal();
             } else {
-                // Jika login, gunakan data default/tersimpan lalu langsung masuk ke aplikasi chat
                 document.getElementById('my-nav-avatar').src = myProfile.avatar;
                 appChat.classList.remove('hidden');
                 initMQTT();
             }
+        }
+
+        // FUNGSIONALITAS LOG OUT
+        function handleLogout() {
+            // Putuskan obrolan aktif jika ada
+            stopChat(false);
+
+            // Tutup koneksi signaling MQTT & PeerJS
+            if (mqttClient) {
+                mqttClient.end();
+                mqttClient = null;
+            }
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+
+            // Reset Form & State Profil
+            document.getElementById('auth-username').value = '';
+            document.getElementById('auth-password').value = '';
+            myProfile = {
+                name: '',
+                dob: '',
+                age: 0,
+                avatar: 'https://via.placeholder.com/80?text=User'
+            };
+
+            // Bersihkan Tampilan Chat
+            chatBox.innerHTML = '';
+
+            // Sembunyikan Aplikasi Chat & Tampilkan Kembali Dashboard Utama
+            appChat.classList.add('hidden');
+            landingPage.classList.remove('hidden');
         }
 
         function openProfileModal() {
@@ -577,6 +626,8 @@
         }
 
         function initMQTT() {
+            if (mqttClient && mqttClient.connected) return;
+
             mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
             mqttClient.on('connect', () => {
@@ -650,12 +701,10 @@
             setActionState('connected');
             addSystemMsg('Terhubung dengan orang asing!');
 
-            // Kirim profil lokal ke partner saat pertama terhubung
             conn.send({ type: 'profile', data: myProfile });
 
             conn.on('data', (payload) => {
                 if (payload.type === 'profile') {
-                    // Menerima profil lawan bicara
                     partnerProfile = payload.data;
                     document.getElementById('partner-name').innerText = partnerProfile.name || 'Orang Asing';
                     document.getElementById('partner-age').innerText = partnerProfile.age ? `Umur: ${partnerProfile.age} tahun` : 'Umur: -';

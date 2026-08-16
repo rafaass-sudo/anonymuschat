@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anonymous P2P Chat</title>
+    <title>P2P Anonymous Chat Realtime</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { display: flex; flex-direction: column; height: 100vh; background: #121212; color: #fff; }
@@ -20,8 +20,9 @@
         #btn-start { background: #007bff; color: #fff; }
     </style>
 
-    <!-- Library WebRTC P2P (PeerJS CDN Gratis) -->
+    <!-- PeerJS & MQTT Client Client-side -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
@@ -32,18 +33,17 @@
     <div id="chat-box"></div>
 
     <div id="controls">
-        <button id="btn-start" onclick="startSearch()">Start / Connect</button>
+        <button id="btn-start" onclick="startSearch()">Start Chat</button>
         <input type="text" id="msg-input" placeholder="Ketik pesan..." disabled onkeypress="handleKeyPress(event)">
         <button id="btn-send" onclick="sendMessage()" disabled>Kirim</button>
     </div>
 
     <script>
-        // Prefix ID publik untuk ruang obrolan bersama di server PeerJS
-        const ROOM_PREFIX = "anonchat_p2p_room_";
-        
+        const SIGNAL_TOPIC = "anonchat_queue_public_v1";
         let peer = null;
         let conn = null;
-        let myPeerId = "";
+        let mqttClient = null;
+        let myPeerId = "user_" + Math.random().toString(36).substr(2, 8);
 
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg-input');
@@ -68,61 +68,58 @@
         function startSearch() {
             if (conn) conn.close();
             if (peer) peer.destroy();
+            if (mqttClient) mqttClient.end();
 
             chatBox.innerHTML = '';
-            addSystemMsg('Menghubungkan ke jaringan P2P...');
+            addSystemMsg('Menyiapkan koneksi P2P...');
             msgInput.disabled = true;
             btnSend.disabled = true;
 
-            // Generate ID acak untuk user
-            myPeerId = ROOM_PREFIX + Math.floor(100000 + Math.random() * 900000);
-
-            // Inisialisasi PeerJS menggunakan Server Publik Bawaan
+            // Inisialisasi PeerJS
             peer = new Peer(myPeerId);
 
             peer.on('open', (id) => {
-                addSystemMsg('Mencari lawan bicara yang aktif...');
-                tryConnectToOthers();
+                addSystemMsg('Mencari lawan bicara...');
+                connectToSignalServer();
             });
 
-            // Mendengarkan jika ada lawan bicara yang menghubungi duluan
             peer.on('connection', (incomingConn) => {
                 conn = incomingConn;
+                if (mqttClient) mqttClient.end();
                 setupConnectionHandlers();
-            });
-
-            peer.on('error', (err) => {
-                console.log(err);
-                tryConnectToOthers();
             });
         }
 
-        function tryConnectToOthers() {
-            // Mencoba mencari ID lain dengan pola prefix acak
-            const targetNumber = Math.floor(100000 + Math.random() * 900000);
-            const targetPeerId = ROOM_PREFIX + targetNumber;
+        function connectToSignalServer() {
+            // Broker MQTT Publik Gratis tanpa login untuk matching antrean
+            mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
-            if (targetPeerId === myPeerId) {
-                setTimeout(tryConnectToOthers, 1000);
-                return;
-            }
-
-            conn = peer.connect(targetPeerId);
-
-            conn.on('open', () => {
-                setupConnectionHandlers();
+            mqttClient.on('connect', () => {
+                mqttClient.subscribe(SIGNAL_TOPIC);
+                // Siarkan ID kita ke pengguna lain
+                mqttClient.publish(SIGNAL_TOPIC, JSON.stringify({ id: myPeerId, action: 'search' }));
             });
 
-            // Jika ID target tidak ditemukan, terus coba pasangkan
-            setTimeout(() => {
-                if (!conn || !conn.open) {
-                    tryConnectToOthers();
-                }
-            }, 2500);
+            mqttClient.on('message', (topic, message) => {
+                try {
+                    const data = JSON.parse(message.toString());
+                    
+                    // Jika ada user lain yang mengirimkan pencarian dan bukan diri sendiri
+                    if (data.action === 'search' && data.id !== myPeerId && !conn) {
+                        // Hubungi ID tersebut via WebRTC Direct
+                        conn = peer.connect(data.id);
+                        
+                        conn.on('open', () => {
+                            if (mqttClient) mqttClient.end();
+                            setupConnectionHandlers();
+                        });
+                    }
+                } catch(e) {}
+            });
         }
 
         function setupConnectionHandlers() {
-            addSystemMsg('Terhubung langsung (P2P) dengan orang asing! Mulai obrolan.');
+            addSystemMsg('Terhubung langsung (P2P) dengan orang asing!');
             msgInput.disabled = false;
             btnSend.disabled = false;
 
@@ -131,7 +128,7 @@
             });
 
             conn.on('close', () => {
-                addSystemMsg('Lawan bicara telah terputus.');
+                addSystemMsg('Lawan bicara terputus.');
                 msgInput.disabled = true;
                 btnSend.disabled = true;
             });

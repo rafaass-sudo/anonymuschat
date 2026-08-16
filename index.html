@@ -26,6 +26,35 @@
             display: none !important;
         }
 
+        /* --- ONLINE BADGE --- */
+        .online-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .online-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #10b981;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
         /* --- DASHBOARD / LANDING PAGE --- */
         #landing-page {
             width: 100%;
@@ -375,6 +404,12 @@
     <div id="landing-page">
         <h1 class="hero-title">Temukan Teman Bicara Baru</h1>
         <p class="hero-desc">Platform percakapan acak P2P langsung dari peramban Anda. Aman, cepat, dan privat.</p>
+        
+        <div class="online-badge">
+            <span class="online-dot"></span>
+            <span id="online-count-landing">1 Pengguna Online</span>
+        </div>
+
         <div class="btn-group-landing">
             <button class="btn-primary" onclick="openAuthModal('register')">DAFTAR</button>
             <button class="btn-secondary" onclick="openAuthModal('login')">MASUK / LOGIN</button>
@@ -429,7 +464,13 @@
     <!-- 4. APPS UTAMA (CHAT INTERFACE) -->
     <div id="app-chat" class="app-container hidden">
         <header>
-            <h2>AnonChat</h2>
+            <div>
+                <h2 style="font-size:1.1rem;">AnonChat</h2>
+                <div class="online-badge" style="padding: 2px 8px; font-size: 0.7rem; margin-top: 2px;">
+                    <span class="online-dot" style="width:6px; height:6px;"></span>
+                    <span id="online-count-chat">1 Online</span>
+                </div>
+            </div>
             <div class="user-nav-info">
                 <img id="my-nav-avatar" class="user-nav-avatar" src="" title="Edit Profil" onclick="openProfileModal()">
                 <button class="btn-logout" onclick="handleLogout()">Log Out</button>
@@ -470,11 +511,17 @@
 
         // P2P & Signaling Variables
         const SIGNAL_TOPIC = "anonchat_queue_public_v3";
+        const PRESENCE_TOPIC = "anonchat_presence_v3";
+        
         let peer = null;
         let conn = null;
         let mqttClient = null;
         let myPeerId = "user_" + Math.random().toString(36).substr(2, 8);
         let isConnected = false;
+
+        // Presence Trackers
+        let activeUsers = new Map();
+        let heartbeatInterval = null;
 
         // DOM Elements
         const landingPage = document.getElementById('landing-page');
@@ -517,13 +564,14 @@
         }
 
         function checkAutoLogin() {
+            initMQTT(); // Jalankan MQTT dari awal untuk menghitung pengguna online di Landing Page
+
             const savedProfile = getStorageItem('anonchat_user_profile');
             const isLoggedIn = getStorageItem('anonchat_is_loggedin');
 
             if (isLoggedIn === 'true' && savedProfile) {
                 try {
                     myProfile = JSON.parse(savedProfile);
-                    // Pastikan umur dihitung ulang
                     if (myProfile.dob) myProfile.age = calculateAge(myProfile.dob);
                     enterChatApp();
                 } catch(e) {}
@@ -537,8 +585,6 @@
             
             document.getElementById('my-nav-avatar').src = myProfile.avatar || 'https://via.placeholder.com/80?text=User';
             appChat.classList.remove('hidden');
-
-            initMQTT();
         }
 
         // --- AUTHENTICATION FLOW ---
@@ -593,6 +639,8 @@
                 peer = null;
             }
 
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+
             removeStorageItem('anonchat_is_loggedin');
             removeStorageItem('anonchat_user_profile');
 
@@ -608,6 +656,8 @@
             chatBox.innerHTML = '';
             appChat.classList.add('hidden');
             landingPage.classList.remove('hidden');
+            
+            initMQTT(); // Re-init MQTT untuk landing page
         }
 
         function openProfileModal() {
@@ -654,6 +704,78 @@
             enterChatApp();
         }
 
+        // --- REALTIME PRESENCE & MQTT ---
+        function initMQTT() {
+            if (mqttClient && mqttClient.connected) return;
+
+            mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+
+            mqttClient.on('connect', () => {
+                mqttClient.subscribe(SIGNAL_TOPIC);
+                mqttClient.subscribe(PRESENCE_TOPIC);
+
+                // Mulai Kirim Heartbeat Setiap 3 Detik
+                startHeartbeat();
+            });
+
+            mqttClient.on('message', (topic, message) => {
+                try {
+                    const data = JSON.parse(message.toString());
+
+                    // Handling Presence / Online Count
+                    if (topic === PRESENCE_TOPIC && data.id) {
+                        activeUsers.set(data.id, Date.now());
+                        updateOnlineUI();
+                    }
+
+                    // Handling Matchmaking Queue
+                    if (topic === SIGNAL_TOPIC && data.action === 'search' && data.id !== myPeerId && !conn && !isConnected) {
+                        conn = peer.connect(data.id);
+                        conn.on('open', () => {
+                            setupConnectionHandlers();
+                        });
+                    }
+                } catch(e) {}
+            });
+        }
+
+        function startHeartbeat() {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+            // Send immediate ping
+            sendPing();
+
+            // Loop ping & cleanup
+            heartbeatInterval = setInterval(() => {
+                sendPing();
+                cleanInactiveUsers();
+            }, 3000);
+        }
+
+        function sendPing() {
+            if (mqttClient && mqttClient.connected) {
+                mqttClient.publish(PRESENCE_TOPIC, JSON.stringify({ id: myPeerId, t: Date.now() }));
+            }
+        }
+
+        function cleanInactiveUsers() {
+            const now = Date.now();
+            // Hapus user yang tidak mengirim ping dalam 7 detik terakhir
+            activeUsers.forEach((lastSeen, userId) => {
+                if (now - lastSeen > 7000) {
+                    activeUsers.delete(userId);
+                }
+            });
+            updateOnlineUI();
+        }
+
+        function updateOnlineUI() {
+            // Minimal 1 (pengguna itu sendiri)
+            const count = Math.max(1, activeUsers.size); 
+            document.getElementById('online-count-landing').innerText = `${count} Pengguna Online`;
+            document.getElementById('online-count-chat').innerText = `${count} Online`;
+        }
+
         // --- P2P CHAT ENGINE ---
         function addSystemMsg(text) {
             const div = document.createElement('div');
@@ -669,28 +791,6 @@
             div.innerText = text;
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function initMQTT() {
-            if (mqttClient && mqttClient.connected) return;
-
-            mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
-
-            mqttClient.on('connect', () => {
-                mqttClient.subscribe(SIGNAL_TOPIC);
-            });
-
-            mqttClient.on('message', (topic, message) => {
-                try {
-                    const data = JSON.parse(message.toString());
-                    if (data.action === 'search' && data.id !== myPeerId && !conn && !isConnected) {
-                        conn = peer.connect(data.id);
-                        conn.on('open', () => {
-                            setupConnectionHandlers();
-                        });
-                    }
-                } catch(e) {}
-            });
         }
 
         function handleActionClick() {
@@ -763,19 +863,16 @@
             setActionState('connected');
             addSystemMsg('Terhubung dengan orang asing!');
 
-            // Kirim profil dengan timeout aman untuk menghindari race condition
             setTimeout(sendMyProfile, 100);
 
             conn.on('data', (payload) => {
                 if (payload && payload.type === 'profile') {
                     partnerProfile = payload.data;
                     
-                    // Render Profil Lawan
                     document.getElementById('partner-name').innerText = partnerProfile.name || 'Orang Asing';
                     document.getElementById('partner-age').innerText = (partnerProfile.age !== undefined && partnerProfile.age !== null) ? `Umur: ${partnerProfile.age} tahun` : 'Umur: -';
                     document.getElementById('partner-avatar').src = partnerProfile.avatar || 'https://via.placeholder.com/80?text=User';
                     
-                    // Respon balik dengan profil sendiri untuk memastikan sinkronisasi 2 arah
                     if (payload.requestBack) {
                         sendMyProfile();
                     }

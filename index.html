@@ -2,70 +2,235 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Anonymous Chat Rafzx</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        body { display: flex; flex-direction: column; height: 100vh; background: #121212; color: #fff; }
-        header { 
-            background: #1f1f1f; 
-            padding: 15px; 
-            text-align: center; 
-            border-bottom: 1px solid #333;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            min-height: 100dvh; /* Menyesuaikan toolbar browser di HP */
+        }
+
+        /* --- CONTAINER UTAMA (RESPONSIF) --- */
+        .app-container {
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            background-color: #1e293b;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        /* Tampilan Khusus Laptop / Tablet (Layar Lebar) */
+        @media (min-width: 768px) {
+            .app-container {
+                max-width: 768px;
+                height: 90vh;
+                max-height: 850px;
+                border-radius: 16px;
+                border: 1px solid #334155;
+            }
+        }
+
+        /* --- HEADER --- */
+        header {
+            background-color: #0f172a;
+            padding: 14px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 1px solid #334155;
         }
+
+        header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
         .online-badge {
-            background: #28a745;
-            color: #fff;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
+            background-color: #059669;
+            color: #ecfdf5;
+            padding: 6px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
             display: flex;
             align-items: center;
             gap: 6px;
         }
+
         .online-dot {
             width: 8px;
             height: 8px;
-            background-color: #fff;
+            background-color: #34d399;
             border-radius: 50%;
             display: inline-block;
+            animation: pulse 2s infinite;
         }
-        #chat-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .message { max-width: 75%; padding: 10px 14px; border-radius: 8px; font-size: 14px; word-wrap: break-word; }
-        .my-msg { background: #007bff; align-self: flex-end; }
-        .stranger-msg { background: #333; align-self: flex-start; }
-        .system-msg { align-self: center; background: transparent; color: #888; font-size: 12px; }
-        #controls { display: flex; padding: 10px; background: #1f1f1f; gap: 8px; }
-        input { flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: #fff; outline: none; }
-        button { padding: 12px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        #btn-send { background: #28a745; color: #fff; }
-        #btn-start { background: #007bff; color: #fff; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* --- AREA CHAT BOX --- */
+        #chat-box {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: #1e293b;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        @media (min-width: 768px) {
+            .message {
+                max-width: 70%;
+            }
+        }
+
+        .my-msg {
+            background-color: #2563eb;
+            color: #ffffff;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .stranger-msg {
+            background-color: #334155;
+            color: #f8fafc;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+
+        .system-msg {
+            align-self: center;
+            background-color: rgba(51, 65, 85, 0.5);
+            color: #94a3b8;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            border-radius: 9999px;
+            text-align: center;
+            margin: 4px 0;
+        }
+
+        /* --- INPUT & TOMBOL KONTROL --- */
+        #controls {
+            display: flex;
+            padding: 12px 16px;
+            background-color: #0f172a;
+            gap: 8px;
+            border-top: 1px solid #334155;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid #334155;
+            background-color: #1e293b;
+            color: #f8fafc;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: #2563eb;
+        }
+
+        input:disabled {
+            background-color: #0f172a;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background-color 0.2s, opacity 0.2s;
+            white-space: nowrap;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #btn-start {
+            background-color: #2563eb;
+            color: #ffffff;
+        }
+
+        #btn-start:hover:not(:disabled) {
+            background-color: #1d4ed8;
+        }
+
+        #btn-send {
+            background-color: #10b981;
+            color: #ffffff;
+        }
+
+        #btn-send:hover:not(:disabled) {
+            background-color: #059669;
+        }
     </style>
 
-    <!-- PeerJS & MQTT Client -->
+    <!-- External Libraries: PeerJS & MQTT Client -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
-    <header>
-        <h2>Anonymous Chat Rafzx</h2>
-        <div class="online-badge">
-            <span class="online-dot"></span>
-            <span id="online-count">0</span> Online
+    <div class="app-container">
+        <header>
+            <h2>Anonymous Chat</h2>
+            <div class="online-badge">
+                <span class="online-dot"></span>
+                <span id="online-count">0</span> Online
+            </div>
+        </header>
+
+        <div id="chat-box"></div>
+
+        <div id="controls">
+            <button id="btn-start" onclick="startSearch()">Start</button>
+            <input type="text" id="msg-input" placeholder="Ketik pesan..." disabled onkeypress="handleKeyPress(event)">
+            <button id="btn-send" onclick="sendMessage()" disabled>Kirim</button>
         </div>
-    </header>
-
-    <div id="chat-box"></div>
-
-    <div id="controls">
-        <button id="btn-start" onclick="startSearch()">Start Chat</button>
-        <input type="text" id="msg-input" placeholder="Ketik pesan..." disabled onkeypress="handleKeyPress(event)">
-        <button id="btn-send" onclick="sendMessage()" disabled>Kirim</button>
     </div>
 
     <script>
@@ -113,11 +278,9 @@
             });
 
             mqttClient.on('connect', () => {
-                // Subscribe topik pendaftaran pencarian & presensi online
                 mqttClient.subscribe(SIGNAL_TOPIC);
                 mqttClient.subscribe(PRESENCE_TOPIC + '+');
 
-                // Kirim sinyal bahwa user ini online
                 sendHeartbeat();
                 heartbeatInterval = setInterval(sendHeartbeat, 5000);
             });
@@ -125,7 +288,6 @@
             mqttClient.on('message', (topic, message) => {
                 const payloadStr = message.toString();
 
-                // Handler untuk perhitungan user online
                 if (topic.startsWith(PRESENCE_TOPIC)) {
                     const userId = topic.replace(PRESENCE_TOPIC, '');
 
@@ -138,7 +300,6 @@
                     return;
                 }
 
-                // Handler untuk matching chat
                 try {
                     const data = JSON.parse(payloadStr);
                     if (data.action === 'search' && data.id !== myPeerId && !conn) {
@@ -150,7 +311,6 @@
                 } catch(e) {}
             });
 
-            // Pembersihan berkala jika ada user yang disconnect tanpa 'will'
             setInterval(() => {
                 const now = Date.now();
                 activeUsers.forEach((lastSeen, uId) => {
@@ -178,7 +338,7 @@
             if (peer) peer.destroy();
 
             chatBox.innerHTML = '';
-            addSystemMsg('Mencari orang...');
+            addSystemMsg('mencari orang...');
             msgInput.disabled = true;
             btnSend.disabled = true;
 
@@ -198,7 +358,7 @@
         }
 
         function setupConnectionHandlers() {
-            addSystemMsg('Terhubung langsung dengan orang asing!');
+            addSystemMsg('Terhubung dengan orang asing!');
             msgInput.disabled = false;
             btnSend.disabled = false;
 
@@ -226,7 +386,6 @@
             if (e.key === 'Enter') sendMessage();
         }
 
-        // Jalankan pelacak presensi saat halaman dimuat
         window.onload = initPresenceSystem;
     </script>
 </body>

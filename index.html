@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AnonChat Rafzx</title>
+    <title>AnonChat & Dashboard</title>
     <style>
         * {
             box-sizing: border-box;
@@ -204,7 +204,7 @@
             background-color: #334155;
         }
 
-        /* --- APP CHAT CONTAINER (OPTIMASI RESPONSIF) --- */
+        /* --- APP CHAT CONTAINER --- */
         .app-container {
             width: 100%;
             height: 100vh;
@@ -266,7 +266,7 @@
             background-color: #dc2626;
         }
 
-        /* --- ROOM SELECTION PANEL (OPTIMASI PERANGKAT HP) --- */
+        /* --- ROOM SELECTION PANEL --- */
         #mode-selector {
             background-color: #0f172a;
             padding: 12px 16px;
@@ -537,8 +537,8 @@
 
     <!-- 1. LANDING PAGE / DASHBOARD UTAMA -->
     <div id="landing-page">
-        <h1 class="hero-title">cari teman/pacar baru mu di web ini</h1>
-        <p class="hero-desc">cari teman mu atau pacar mu di web ini sekarang</p>
+        <h1 class="hero-title">Temukan Teman Bicara Baru</h1>
+        <p class="hero-desc">Platform percakapan acak P2P dan Ruang Obrolan Privat langsung dari peramban Anda.</p>
         
         <div class="online-badge">
             <span class="online-dot"></span>
@@ -615,7 +615,7 @@
         <!-- PANEL PILIHAN MODAL / RUANG OBROLAN -->
         <div id="mode-selector">
             <div class="room-input-group">
-                <input type="text" id="input-room-id" placeholder="KODE ROOM (CONTOH: ROOM_BXJSKE)">
+                <input type="text" id="input-room-id" placeholder="KODE ROOM (E.G. ROOM123)">
                 <button class="btn-room" onclick="joinRoom()">Masuk Room</button>
                 <button class="btn-room-secondary" onclick="generateRoom()">Buat Room</button>
             </div>
@@ -668,8 +668,8 @@
         let partnerProfile = null;
 
         // P2P & Signaling Variables
-        const PUBLIC_SIGNAL_TOPIC = "anonchat_queue_public_v3";
-        const PRESENCE_TOPIC = "anonchat_presence_v3";
+        const PUBLIC_SIGNAL_TOPIC = "anonchat_queue_public_v4";
+        const PRESENCE_TOPIC = "anonchat_presence_v4";
         let currentSignalTopic = PUBLIC_SIGNAL_TOPIC;
         
         let peer = null;
@@ -682,6 +682,7 @@
         let myPeerId = "user_" + Math.random().toString(36).substr(2, 8);
         let isConnected = false;
         let activeRoomId = null;
+        let searchInterval = null;
 
         // Presence Trackers
         let activeUsers = new Map();
@@ -876,7 +877,8 @@
         function initMQTT() {
             if (mqttClient && mqttClient.connected) return;
 
-            mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+            // Menggunakan EMQX Broker publik cadangan yang lebih fleksibel
+            mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
             mqttClient.on('connect', () => {
                 mqttClient.subscribe(PUBLIC_SIGNAL_TOPIC);
@@ -895,10 +897,14 @@
                     }
 
                     if (topic === currentSignalTopic && data.action === 'search' && data.id !== myPeerId && !conn && !isConnected) {
-                        conn = peer.connect(data.id);
-                        conn.on('open', () => {
-                            setupConnectionHandlers();
-                        });
+                        if (peer && peer.open) {
+                            conn = peer.connect(data.id);
+                            if (conn) {
+                                conn.on('open', () => {
+                                    setupConnectionHandlers();
+                                });
+                            }
+                        }
                     }
                 } catch(e) {}
             });
@@ -1000,6 +1006,7 @@
 
         function setActionState(state) {
             if (state === 'connected') {
+                if (searchInterval) clearInterval(searchInterval);
                 btnAction.innerText = 'Stop';
                 btnAction.className = 'btn-stop';
                 isConnected = true;
@@ -1007,6 +1014,7 @@
                 btnSend.disabled = false;
                 partnerBar.classList.remove('hidden');
             } else {
+                if (searchInterval) clearInterval(searchInterval);
                 btnAction.innerText = activeRoomId ? 'Cari Di Room' : 'Random Match';
                 btnAction.className = 'btn-start';
                 isConnected = false;
@@ -1028,6 +1036,7 @@
         function startSearch() {
             if (conn) conn.close();
             if (peer) peer.destroy();
+            if (searchInterval) clearInterval(searchInterval);
 
             if (!activeRoomId) {
                 chatBox.innerHTML = '';
@@ -1039,16 +1048,31 @@
             setActionState('disconnected');
             btnAction.innerText = 'Mencari...';
 
-            peer = new Peer(myPeerId);
+            // Penambahan STUN Server Google untuk koneksi mobile / NAT
+            peer = new Peer(myPeerId, {
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' }
+                    ]
+                }
+            });
 
             peer.on('open', () => {
-                if (mqttClient && mqttClient.connected) {
-                    mqttClient.publish(currentSignalTopic, JSON.stringify({ id: myPeerId, action: 'search' }));
-                }
+                // Sinyal dikirim berulang tiap 2 detik sampai lawan bicara ditemukan
+                searchInterval = setInterval(() => {
+                    if (!isConnected && mqttClient && mqttClient.connected) {
+                        mqttClient.publish(currentSignalTopic, JSON.stringify({ id: myPeerId, action: 'search' }));
+                    } else {
+                        clearInterval(searchInterval);
+                    }
+                }, 2000);
             });
 
             peer.on('connection', (incomingConn) => {
                 if (isConnected) return;
+                if (searchInterval) clearInterval(searchInterval);
                 conn = incomingConn;
                 conn.on('open', () => {
                     setupConnectionHandlers();
